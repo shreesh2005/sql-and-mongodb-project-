@@ -1,0 +1,16 @@
+{
+  "name": "tata-supply-chain-fullstack",
+  "version": "1.0.0",
+  "description": "Full-Stack Supply Chain Management System with MySQL and MongoDB",
+  "main": "server/index.js",
+  "scripts": {
+    "install-all": "npm install && npm install --prefix server && npm install --prefix client",
+    "server": "npm run dev --prefix server",
+    "client": "npm run dev --prefix client",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "build": "npm run build --prefix client"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

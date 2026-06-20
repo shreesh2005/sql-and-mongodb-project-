@@ -1,42 +1,79 @@
-# Tata Supply Chain Co. Ltd. — Database Management System
+# Tata Supply Chain Management System
 
-An end-to-end relational database solution designed for **Tata Supply Chain Co. Ltd.** to automate, optimize, and seamlessly track day-to-day procurement, storage, and material allocation operations[cite: 3]. Built with **MySQL 8.x** and fully normalized to **3rd Normal Form (3NF)**.
+An end-to-end full-stack Enterprise Resource Planning (ERP) and Supply Chain Management (SCM) portal designed for **Tata Supply Chain Co. Ltd.** to automate, optimize, and track procurement, storage, material issue requisition, and quality audits.
+
+This project implements a **Hybrid Database Architecture** linking a 3NF Normalized relational database (**MySQL**) with a scalable document logging store (**MongoDB**).
+
+---
 
 ## 🏢 Project Context
-* **Institution:** USM's Shriram Mantri Vidyanidhi Info Tech Academy[cite: 3]
-* **Subject:** Database Management System (DBMS)[cite: 3]
-* **Target Scale:** Managing dynamic records for baseline raw materials and finished engineering assemblies across multi-vendor networks[cite: 3].
+* **Institution:** USM's Shriram Mantri Vidyanidhi Info Tech Academy
+* **Subject:** Database Management System (DBMS) & Full-Stack Migration
+* **Architecture:** Node.js (Express) + Sequelize (MySQL) + Mongoose (MongoDB) + React (Vite + Tailwind CSS)
 
 ---
 
-## 📊 Relational Architecture & Entity Summary
-The database system removes operational confusion by decoupling multi-valued properties and tracking delivery documents natively[cite: 3]. The architecture consists of **13 normalized tables**:
-
-* **Core Masters:** `Part_Category`, `Part`, `Vendor`, `Transporter`[cite: 1, 2]
-* **Dynamic Junctions (M:N):** `Vendor_Part` (Tracks custom vendor rates, lead times, and preferred statuses to prevent pricing confusion)[cite: 1, 2, 3]
-* **Transaction Lifecycle:** `Purchase_Order`, `Purchase_Order_Detail`, `Challan`, `GRR` (Goods Received Report), `GRR_Detail`, `Quality_Inspection`, `MIR` (Material Issue Requisition), `MIR_Detail`[cite: 1, 2, 3]
-
-### Normalization Benchmarks
-* **1NF:** Ensured all structural attributes are atomic (e.g., separating vendor address blocks into granular city, state, and pin segments)[cite: 1, 2].
-* **2NF:** Eliminated partial dependencies on composite keys inside the `Vendor_Part` junction framework.
-* **3NF:** Eliminated transitive anomalies by extracting part categories out of the main `Part` matrix into a dedicated `Part_Category` relationship index[cite: 1].
+## 📊 Relational Core (MySQL)
+The database structure contains **13 3NF tables** to handle transactions and core catalog data:
+* **Core Masters:** `Part_Category`, `Part`, `Vendor`, `Transporter`
+* **Junction (M:N):** `Vendor_Part` (tracks negotiated pricing agreements)
+* **ACID Transactions:** `Purchase_Order`, `Purchase_Order_Detail`, `Challan`, `GRR`, `GRR_Detail`, `Quality_Inspection`, `MIR`, `MIR_Detail`
 
 ---
 
-## 📁 Repository Map
-* `/database`: Houses `Tata_SCDB_Schema.sql` containing the structured table definitions, cascading constraint rules, and sample historical transactions.
-* `/scripts`: Contains `make_excel.py`, a tracking engine written in Python utilizing `openpyxl` to auto-compile formatted reports directly from python data objects[cite: 1].
-* `/documentation`: Holds the engineering data dictionaries, primary/foreign key mapping matrices, and underlying assumptions[cite: 1].
+## 🍃 Logging & Analytics Core (MongoDB)
+MongoDB Atlas holds unstructured, transactional audit, and workflow documents:
+* **approval_workflows:** Multi-stage PO and MIR authorization pipelines.
+* **vendor_performance:** Rejection rates, lead-times, and QC scores.
+* **quality_reports:** Quality audits, anomalies, and AI checks.
+* **inventory_movements:** Chronological log of stock inward/outward events.
+* **delivery_tracking:** Transporter shipment logs and GPS checkpoints.
+* **audit_logs:** User modification histories and changed payloads.
+* **document_repository:** Binary attachments and PDFs managed via **MongoDB GridFS**.
+* **warehouse_sensor_data:** IoT logs for warehouse climate controls.
 
 ---
 
-## 🚀 Local Deployment Guide
+## 🚀 Installation & Local Execution
 
-### Prerequisites
-* **Database:** MySQL Server (v8.0 or higher) and a client interface like MySQL Workbench.
-* **Script Engine:** Python 3.x with the `openpyxl` library installed (`pip install openpyxl`).
-
-### 1. Initialize the Relational Schema
-Log into your local MySQL CLI or Workbench instance and execute the schema initialization script:
+### 1. Database Setup
+Ensure you have MySQL and MongoDB running locally. Run the schema initialization script:
 ```sql
+CREATE DATABASE tata_supply_chain;
+USE tata_supply_chain;
 SOURCE E:/STUDY/CDAC/Project/files/Tata_SCDB_Schema.sql;
+```
+
+### 2. Environment Configurations
+Configure the `.env` file at the root:
+```env
+PORT=5000
+MYSQL_HOST=localhost
+MYSQL_USER=root
+MYSQL_PASSWORD=your_password
+MYSQL_DATABASE=tata_supply_chain
+MONGODB_URI=mongodb://localhost:27017/tata_supply_chain
+JWT_SECRET=tata_supply_chain_secret_key
+```
+
+### 3. Dependencies & Running
+Run the following commands in your terminal:
+```bash
+# Install root, backend and frontend dependencies
+npm run install-all
+
+# Start local SCM server and client concurrently
+npm run dev
+```
+
+* **Vite React Portal:** `http://localhost:3000`
+* **Express REST API Server:** `http://localhost:5000`
+* **Default Admin Account:** `admin` / `admin123`
+
+---
+
+## 📁 Repository Structure Reference
+* `/server`: Backend API controllers, models (Sequelize & Mongoose), routes, and synchronization services.
+* `/client`: React Vite frontend with dashboard analytics charts, layouts, contexts, and SCM sheets.
+* `/docs`: Detailed references for [REST APIs](./docs/API.md), [Database Architecture](./docs/ARCHITECTURE.md), and [Deployment](./docs/DEPLOYMENT.md).
+* `/make_excel.py`: Original Python openpyxl reporting engine.
