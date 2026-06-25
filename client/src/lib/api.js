@@ -1,7 +1,43 @@
-// Client-side mock API database using localStorage
-// Emulates Axios interface exactly so that React pages do not need to change
+import axios from 'axios';
 
-// Seed initial data if localStorage is empty
+// ==========================================
+// 1. REAL BACKEND AXIOS INSTANCE
+// ==========================================
+const realApi = axios.create({
+  baseURL: '', // Proxied via Vite config to http://localhost:5000
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+
+realApi.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+realApi.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+// ==========================================
+// 2. MOCK CLIENT-SIDE DATABASE (localStorage)
+// ==========================================
 const initMockDB = () => {
   if (!localStorage.getItem('mock_users')) {
     localStorage.setItem('mock_users', JSON.stringify([
@@ -97,16 +133,13 @@ const initMockDB = () => {
   }
 };
 
-initMockDB();
-
-// Helper to get from localstorage
 const getMockData = (key) => JSON.parse(localStorage.getItem(key));
 const saveMockData = (key, data) => localStorage.setItem(key, JSON.stringify(data));
 
-// Emulated axios client
-const api = {
+// Emulated axios client for GitHub Pages
+const mockApi = {
   get: async (url) => {
-    // Artificial delay to simulate network latency
+    initMockDB();
     await new Promise(resolve => setTimeout(resolve, 200));
 
     if (url.includes('/api/auth/profile')) {
@@ -117,7 +150,7 @@ const api = {
     if (url.includes('/api/vendors')) {
       const parts = url.split('/');
       const id = parts[parts.length - 1];
-      if (id !== 'vendors') { // Single vendor
+      if (id !== 'vendors') {
         const vendors = getMockData('mock_vendors');
         const v = vendors.find(item => item.vendor_code === id);
         return { data: { success: true, data: { ...v, performance: { qualityScore: v.qualityScore, rejectionRate: v.rejectionRate, ratings: [], deliveryHistory: [], comments: [] } } } };
@@ -132,13 +165,11 @@ const api = {
     if (url.includes('/api/purchase-orders')) {
       const parts = url.split('/');
       const id = parts[parts.length - 1];
-      if (id !== 'purchase-orders') { // Single PO
+      if (id !== 'purchase-orders') {
         const pos = getMockData('mock_pos');
         const vendors = getMockData('mock_vendors');
         const po = pos.find(item => item.po_number === id);
         const v = vendors.find(item => item.vendor_code === po.vendor_code);
-        
-        // Mock workflow status
         const workflow = {
           entityId: po.po_number,
           status: po.approvalStatus,
@@ -174,7 +205,7 @@ const api = {
     if (url.includes('/api/grr')) {
       const parts = url.split('/');
       const id = parts[parts.length - 1];
-      if (id !== 'grr') { // Single GRR
+      if (id !== 'grr') {
         const grrs = getMockData('mock_grrs');
         const grr = grrs.find(g => String(g.grr_no) === String(id));
         return { data: { success: true, data: grr } };
@@ -185,7 +216,6 @@ const api = {
     if (url.includes('/api/quality-inspections')) {
       const inspections = getMockData('mock_inspections');
       const grrDetails = getMockData('mock_grrs').flatMap(g => g.details);
-      
       const enriched = inspections.map(ins => {
         const det = grrDetails.find(d => d.grr_detail_id === ins.grr_detail_id) || {};
         return {
@@ -202,8 +232,7 @@ const api = {
     }
 
     if (url.includes('/api/mir')) {
-      const mirList = getMockData('mock_mirs');
-      return { data: { success: true, data: mirList } };
+      return { data: { success: true, data: getMockData('mock_mirs') } };
     }
 
     if (url.includes('/api/inventory/status')) {
@@ -238,7 +267,7 @@ const api = {
 
       const totalVendors = vendors.length;
       const totalPOs = pos.length;
-      const pendingGRRs = grrs.length; // mock pending
+      const pendingGRRs = grrs.length;
       const inventoryValue = parts.reduce((acc, p) => acc + (p.opening_stock * p.unit_rate), 0);
       const rejectedQty = inspections.reduce((acc, i) => acc + i.rejected_qty, 0);
       const acceptedQty = inspections.reduce((acc, i) => acc + i.accepted_qty, 0);
@@ -290,6 +319,7 @@ const api = {
   },
 
   post: async (url, data) => {
+    initMockDB();
     await new Promise(resolve => setTimeout(resolve, 200));
 
     if (url.includes('/api/auth/login')) {
@@ -323,7 +353,6 @@ const api = {
       pos.push(newPo);
       saveMockData('mock_pos', pos);
 
-      // Trigger audit log
       const logs = getMockData('mock_audit_logs');
       logs.push({ _id: Math.random().toString(), username: 'admin', action: 'CREATE_PO', entity: 'PurchaseOrder', entityId: data.po_number, timestamp: new Date() });
       saveMockData('mock_audit_logs', logs);
@@ -349,7 +378,6 @@ const api = {
       grrs.push(newGrr);
       saveMockData('mock_grrs', grrs);
 
-      // Trigger inward stock movement log
       const movements = getMockData('mock_movements');
       data.details.forEach(l => {
         movements.push({
@@ -375,7 +403,6 @@ const api = {
       inspections.push(newQi);
       saveMockData('mock_inspections', inspections);
 
-      // Update part stock in mock database
       const grrDetails = getMockData('mock_grrs').flatMap(g => g.details);
       const grrLine = grrDetails.find(d => d.grr_detail_id === data.grr_detail_id);
       if (grrLine) {
@@ -400,10 +427,8 @@ const api = {
       mirList.push(newMir);
       saveMockData('mock_mirs', mirList);
 
-      // Update stock decrement and add outward movement log
       const parts = getMockData('mock_parts');
       const movements = getMockData('mock_movements');
-
       data.details.forEach(l => {
         const p = parts.find(item => item.part_no === l.part_no);
         if (p) {
@@ -426,7 +451,6 @@ const api = {
 
     if (url.includes('/api/documents/upload')) {
       const docs = getMockData('mock_docs');
-      // Payload is FormData, we mock file upload details
       const newDoc = {
         _id: Math.random().toString(),
         filename: data.get('file')?.name || 'upload.pdf',
@@ -447,9 +471,10 @@ const api = {
   },
 
   put: async (url, data) => {
+    initMockDB();
     await new Promise(resolve => setTimeout(resolve, 200));
 
-    if (url.includes('/approve')) { // Approval workflow PO
+    if (url.includes('/approve')) {
       const parts = url.split('/');
       const poNum = parts[parts.length - 2];
       const pos = getMockData('mock_pos');
@@ -475,7 +500,7 @@ const api = {
       }
     }
 
-    if (url.includes('/api/notifications')) { // Mark read
+    if (url.includes('/api/notifications')) {
       const parts = url.split('/');
       const id = parts[parts.length - 2];
       const notifications = getMockData('mock_notifications');
@@ -491,6 +516,7 @@ const api = {
   },
 
   delete: async (url) => {
+    initMockDB();
     await new Promise(resolve => setTimeout(resolve, 200));
 
     if (url.includes('/api/documents')) {
@@ -514,5 +540,12 @@ const api = {
     return { data: { success: true } };
   }
 };
+
+// ==========================================
+// 3. AUTO-SWITCHING EXPORT
+// ==========================================
+// Automatically switches to mock DB when deployed on GitHub Pages (*.github.io)
+const isGitHubPages = window.location.hostname.includes('github.io');
+const api = isGitHubPages ? mockApi : realApi;
 
 export default api;
